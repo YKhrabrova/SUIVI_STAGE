@@ -205,3 +205,83 @@ Yaroslava Khrabrova
 ---
 
 ## Période : 19 - 23 mai
+
+### Tâche: Reroutage de colis Web en magasin
+
+**Contexte**
+
+En tant qu'agent dépôt au service d'expédition, il est nécessaire de permettre le reroutage d'un colis magasin contenant des commandes web vers le même magasin. Actuellement, le reroutage est bloqué si le colis contient des commandes web, même lorsque le magasin d'arrivée est identique au magasin de départ. Cette limitation empêche la régénération de l'étiquette colis, ce qui est une exigence opérationnelle.
+
+---
+
+**Travail réalisé**
+
+- Analyse de code:
+  - Cette méthode gère la logique de reroutage des colis, y compris la création de nouvelles expéditions et la suppression des anciennes.
+  - La méthode utilise des processus standards pour la création d'expéditions et la gestion des tâches associées.
+- Identification de problème (Le reroutage est bloqué pour les colis contenant des commandes web, même lorsque le magasin d'arrivée est identique au magasin de départ)
+
+- Ajout d'une condition pour autoriser le reroutage si le magasin d'arrivée est identique au magasin de départ, même si le colis contient des commandes web.
+- Si le magasin d'arrivée est différent, le reroutage reste bloqué pour les colis contenant des commandes web.
+- Ajout d'une étape pour relancer l'impression de l'étiquette colis après la création de la nouvelle expédition.
+- Si l'impression automatique n'est pas possible, une indication est ajoutée dans la popup de confirmation pour demander à l'utilisateur de réimprimer l'étiquette manuellement.
+- Réorganisation des conditions pour clarifier la logique de reroutage.
+- Extraction de certaines parties du code en méthodes privées pour réduire la complexité de `saveFctRoutage`.
+- Utilisation de la méthode  pour vérifier la présence de commandes web dans le colis.
+- Appel des processus standards pour la suppression des anciennes expéditions et la création des nouvelles.
+- Le reroutage est désormais possible pour les colis contenant des commandes web si le magasin d'arrivée est identique au magasin de départ.
+- Une nouvelle étiquette colis est générée automatiquement après le reroutage. Si ce n'est pas possible, une notification est affichée pour demander la réimpression manuelle.
+- Le code est plus lisible et maintenable grâce au refactoring effectué.
+
+### Tâche: Tracer les erreurs des appels API parcels
+
+## Contexte
+
+L'objectif est de tracer les erreurs des appels API `parcels` afin de pouvoir retrouver les erreurs associées aux contenus des requêtes d'origine. Les données à tracer incluent :
+
+- **Contenu de l'appel (JSON)** : le corps de la requête initiale.
+- **Erreur (JSON)** : les détails de l'exception levée.
+- **Code d'erreur** : le statut HTTP associé à l'erreur.
+- **Date/heure** : le moment où l'erreur s'est produite.
+
+---
+
+## Travail réalisé
+
+### Mise en place d'un filtre pour capturer le contenu des requêtes
+
+- Un filtre personnalisé `RequestCachingFilter` a été implémenté pour envelopper les requêtes avec un `ContentCachingRequestWrapper`. Cela permet de conserver le contenu des requêtes pour les lire ultérieurement, même après leur traitement.
+- Ce filtre a été enregistré dans la configuration via la classe `FilterConfig`.
+
+### Gestion des erreurs dans un ErrorHandler global
+
+- Une classe `ErrorHandler` a été créée pour centraliser la gestion des exceptions.
+- Lorsqu'une erreur survient :
+  - Le contenu de la requête est extrait à l'aide du `ContentCachingRequestWrapper` et désérialisé en objet JSON.
+  - Les détails de l'erreur, le code d'erreur et la date/heure sont encapsulés dans un objet `ApiErrorLog`.
+
+### Problème de sérialisation de `LocalDateTime`
+
+- Lors de la sérialisation de l'objet `ApiErrorLog`, un problème est survenu avec le champ `timestamp` de type `LocalDateTime`. Par défaut, Jackson ne sait pas comment sérialiser ce type.
+- Solution : Utilisation de la méthode `findAndRegisterModules()` de l'`ObjectMapper` pour enregistrer automatiquement les modules nécessaires, comme le module Java Time.
+
+### Structure des données tracées
+
+- L'objet `ApiErrorLog` a été conçu pour contenir les données à tracer.
+- Une méthode `getFormattedTimestamp()` a été ajoutée pour formater la date/heure en chaîne lisible.
+- Le contenu de la requête est stocké sous forme d'objet JSON pour éviter les problèmes de double sérialisation.
+
+---
+
+## Cas en succès et en erreur
+
+- **Cas en succès** : Lorsqu'une erreur API est levée, les données (contenu de la requête, erreur, code d'erreur, date/heure) sont correctement tracées et visualisables dans l'outil de journalisation.
+- **Cas en erreur** : Si le `ContentCachingRequestWrapper` n'est pas utilisé ou si le filtre n'est pas correctement configuré, le contenu de la requête ne peut pas être lu, ce qui empêche de tracer les erreurs correctement.
+
+---
+
+## Résolution des problèmes
+
+- **Problème de sérialisation de `LocalDateTime`** : Résolu en enregistrant les modules nécessaires avec Jackson.
+- **Problème de lecture du contenu de la requête** : Résolu en enveloppant les requêtes avec `ContentCachingRequestWrapper` via le filtre `RequestCachingFilter`.
+- **Problème de double sérialisation** : Résolu en stockant le contenu de la requête sous forme d'objet JSON au lieu de chaîne.
